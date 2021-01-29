@@ -34,3 +34,6 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# folder created by unit test
+www/hardcode
