@@ -1,34 +1,35 @@
 #!/usr/bin/env python3
-#  coding: utf-8 
+
+"""
+Copyright 2021 Abram Hindle, Eddie Antonio Santos, Gengyuan Huang
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Furthermore it is derived from the Python documentation examples thus
+some of the code is Copyright © 2001-2013 Python Software
+Foundation; All Rights Reserved
+
+http://docs.python.org/2/library/socketserver.html
+
+"""
+
 import socketserver
 import os
 
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Furthermore it is derived from the Python documentation examples thus
-# some of the code is Copyright © 2001-2013 Python Software
-# Foundation; All Rights Reserved
-#
-# http://docs.python.org/2/library/socketserver.html
-#
-# run: python freetests.py
-
-# try: curl -v -X GET http://127.0.0.1:8080/
-
-ENCODING_METHOD = 'utf-8'
+ENCODING_METHOD = 'utf-8'       # encoding method
+LOG_TO_STDOUT = True            # set to True will print log to stdout
+LOG_DEEP = False                # set to True if you want complete log
+HOST, PORT = "localhost", 8080  # server address
 
 # helpers - parser
 def convertByteToStr(byteData):
@@ -166,33 +167,37 @@ def handleRequestGET(requestDict):
 
     # respond and close connection if path not exist or not correct
     if path_corrected == None:
-        return headerHTTPVersion(1.1) + " "                         + \
-            headerStatusCode(404) + "\r\n"                          + \
-                headerConnection("Closed") + "\r\n\r\n"
+        header = \
+            headerHTTPVersion(1.1) + " "                                + \
+                headerStatusCode(404) + "\r\n"                          + \
+                    headerConnection("Closed") + "\r\n\r\n"
+        return bytearray(header, ENCODING_METHOD), b''
 
     if path_corrected != path:
-        return headerHTTPVersion(1.1) + " "                                     + \
-            headerStatusCode(301) + "\r\n"                                      + \
-                headerLocation("http://" + host + path_corrected) + "\r\n"      + \
-                    headerConnection("Closed") + "\r\n\r\n"
+        header = \
+            headerHTTPVersion(1.1) + " "                                            + \
+                headerStatusCode(301) + "\r\n"                                      + \
+                    headerLocation("http://" + host + path_corrected) + "\r\n"      + \
+                        headerConnection("Closed") + "\r\n\r\n"
+        return bytearray(header, ENCODING_METHOD), b''
 
     # retrive data
     # for this assignment only suppose css and html file
     path_real = "." + path_corrected
     if os.path.isdir(path_real):
         # serve index.html
-        response = \
+        header = \
             headerHTTPVersion(1.1) + " "                                        + \
                 headerStatusCode(200) + "\r\n"                                  + \
                     headerContent("text/html") + "\r\n"                         + \
                         headerConnection("Closed") + "\r\n\r\n"
-
+        response = b''
         # get content, append at the end of response
-        with open(path_real + "/" + "index.html") as f:
+        with open(path_real + "/" + "index.html", "rb") as f:
             response += f.read()
         
         # return respond
-        return response
+        return bytearray(header, ENCODING_METHOD), response
     else:
         # serve file
         # only support html/css
@@ -219,18 +224,19 @@ def handleRequestGET(requestDict):
             content_type = "application/pdf"
 
         # serve
-        response = \
+        header = \
             headerHTTPVersion(1.1) + " "                                        + \
                 headerStatusCode(200) + "\r\n"                                  + \
                     headerContent(content_type) + "\r\n"                         + \
                         headerConnection("Closed") + "\r\n\r\n"
 
         # get content, append at the end of response
-        with open(path_real) as f:
+        response = b''
+        with open(path_real, "rb") as f:
             response += f.read()
         
         # return respond
-        return response
+        return bytearray(header, ENCODING_METHOD), response
 
 def handleRequest(byteData):
     # handling all requests
@@ -240,26 +246,37 @@ def handleRequest(byteData):
     stringData = convertByteToStr(byteData)
     requestDict = parseValidRequest(stringData)
     if requestDict == None:
-        return headerHTTPVersion(1.1) + " "                         + \
-            headerStatusCode(400) + "\r\n"                          + \
-                headerConnection("Closed") + "\r\n\r\n"
+        header = \
+            headerHTTPVersion(1.1) + " "                                + \
+                headerStatusCode(400) + "\r\n"                          + \
+                    headerConnection("Closed") + "\r\n\r\n"
+        return bytearray(header, ENCODING_METHOD), b''
+
+    # log
+    if LOG_TO_STDOUT:
+        print("HTTP Request: %s\n" % requestDict["method"])
 
     # parse method line - firstline of the data
     methodline = requestDict["method"]
     methodline_splited = methodline.split()
     if len(methodline_splited) != 3:
-        return headerHTTPVersion(1.1) + " "                         + \
-            headerStatusCode(400) + "\r\n"                          + \
-                headerConnection("Closed") + "\r\n\r\n"
+        header = \
+            headerHTTPVersion(1.1) + " "                                + \
+                headerStatusCode(400) + "\r\n"                          + \
+                    headerConnection("Closed") + "\r\n\r\n"
+        return bytearray(header, ENCODING_METHOD), b''
+
     else:
         # direct to each method's function
         if methodline_splited[0] == 'GET':
             return handleRequestGET(requestDict)
         else:
             # cannot handle
-            return headerHTTPVersion(1.1) + " "                     + \
-                headerStatusCode(405) + "\r\n"                      + \
-                    headerConnection("Closed") + "\r\n\r\n"
+            header = \
+                headerHTTPVersion(1.1) + " "                            + \
+                    headerStatusCode(405) + "\r\n"                      + \
+                        headerConnection("Closed") + "\r\n\r\n"
+            return bytearray(header, ENCODING_METHOD), b''
 
 class MyWebServer(socketserver.BaseRequestHandler):
     
@@ -268,17 +285,21 @@ class MyWebServer(socketserver.BaseRequestHandler):
         self.data = self.request.recv(1024).strip()
         
         # log
-        print("Got a request of: %s\n" % self.data)
+        if LOG_TO_STDOUT:
+            if LOG_DEEP:
+                print("Receives Data: \n%s\n" % self.data)
         
         # repond data
-        responseString = handleRequest(self.data)
-        responseByte = bytearray(responseString, 'utf-8')
+        header, body = handleRequest(self.data)             # header and body are both of type bytes
 
-        self.request.sendall(responseByte)
+        # log
+        if LOG_TO_STDOUT:
+            print("Responds with: \n%s\n" % header)
+
+        # send back response
+        self.request.sendall(header + body)
 
 if __name__ == "__main__":
-    HOST, PORT = "localhost", 8080
-
     socketserver.TCPServer.allow_reuse_address = True
     # Create the server, binding to localhost on port 8080
     server = socketserver.TCPServer((HOST, PORT), MyWebServer)
